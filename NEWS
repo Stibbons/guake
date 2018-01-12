@@ -1,7 +1,18 @@
+Version 0.8.13
+==============
+
+Maintenance release
+
+Version 0.8.12
+==============
+
+Maintenance release
+
+
 Version 0.8.11
 ==============
 
-Maintainance release with bug fixes and translation updates.
+Maintenance release with bug fixes and translation updates.
 
 - #885 revert to the old fixed-width tabs behavior
 - move the startup script setting to the hooks tab

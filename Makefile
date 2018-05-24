@@ -82,13 +82,13 @@ install-guake:
 	@if [ -f guake/paths.py.dev ]; then rm -f guake/paths.py.dev; fi
 	@if [ -f guake/paths.py ]; then mv guake/paths.py guake/paths.py.dev; fi
 	@cp -f guake/paths.py.in guake/paths.py
-	@sed -i -e 's|{{ LOCALE_DIR }}|$(localedir)|g' guake/paths.py
-	@sed -i -e 's|{{ IMAGE_DIR }}|$(IMAGE_DIR)|g' guake/paths.py
-	@sed -i -e 's|{{ GLADE_DIR }}|$(GLADE_DIR)|g' guake/paths.py
-	@sed -i -e 's|{{ GUAKE_THEME_DIR }}|$(GUAKE_THEME_DIR)|g' guake/paths.py
-	@sed -i -e 's|{{ SCHEMA_DIR }}|$(SCHEMA_DIR)|g' guake/paths.py
-	@sed -i -e 's|{{ LOGIN_DESTOP_PATH }}|$(LOGIN_DESTOP_PATH)|g' guake/paths.py
-	@sed -i -e 's|{{ AUTOSTART_FOLDER }}|$(AUTOSTART_FOLDER)|g' guake/paths.py
+	@sed -i -e 's|{{ LOCALE_DIR }}|"$(localedir)"|g' guake/paths.py
+	@sed -i -e 's|{{ IMAGE_DIR }}|"$(IMAGE_DIR)"|g' guake/paths.py
+	@sed -i -e 's|{{ GLADE_DIR }}|"$(GLADE_DIR)"|g' guake/paths.py
+	@sed -i -e 's|{{ GUAKE_THEME_DIR }}|"$(GUAKE_THEME_DIR)"|g' guake/paths.py
+	@sed -i -e 's|{{ SCHEMA_DIR }}|"$(SCHEMA_DIR)"|g' guake/paths.py
+	@sed -i -e 's|{{ LOGIN_DESTOP_PATH }}|"$(LOGIN_DESTOP_PATH)"|g' guake/paths.py
+	@sed -i -e 's|{{ AUTOSTART_FOLDER }}|"$(AUTOSTART_FOLDER)"|g' guake/paths.py
 
 	@$(PYTHON_INTERPRETER) setup.py install --root "$(DESTDIR)" --prefix="$(prefix)" --optimize=1
 
@@ -99,7 +99,7 @@ install-guake:
 	@rm -rfv build *.egg-info
 
 install-locale:
-	for f in $$(find po -iname "*.mo"); do \
+	for f in $$(find data/po -iname "*.mo"); do \
 		l="$${f%%.*}"; \
 		lb=$$(basename $$l); \
 		install -Dm644 "$$f" "$(DESTDIR)$(localedir)/$$lb/LC_MESSAGES/guake.mo"; \
@@ -203,6 +203,7 @@ bdist:
 wheels:
 	pipenv run python setup.py bdist_wheel
 
+wheel: wheels
 
 run-local: compile-glib-schemas-dev
 	pipenv run ./scripts/run-local.sh
@@ -220,6 +221,14 @@ test:
 
 test-coverage:
 	pipenv run py.test -v --cov $(MODULE) --cov-report term-missing
+
+test-pip-install: wheel
+	@echo "Testing installation by pip (will install on ~/.local)"
+	@rm -rfv ~/.local/guake
+	@rm -rfv ~/.local/lib/python3.*/site-packages/guake
+	pip install --upgrade --user $(shell ls -1 dist/*.whl | sort | head -n 1)
+	ls -la ~/.local/share/guake
+	~/.local/bin/guake
 
 sct: style check update-po requirements test
 
@@ -290,13 +299,14 @@ clean-py:
 	@pipenv --rm ; true
 	@find . -name "*.pyc" -exec rm -f {} \;
 	@rm -f $(DEV_DATA_DIR)/guake-prefs.desktop $(DEV_DATA_DIR)/guake.desktop
-	@rm -rf .eggs *.egg-info po/*.pot
+	@rm -rf .eggs *.egg-info data/po/*.pot
 
 clean-paths:
 	rm -f guake/paths.py guake/paths.py.dev
+
 clean-po:
-	@rm -f po/guake.pot
-	@find po -name "*.mo" -exec rm -f {} \;
+	@rm -f data/po/guake.pot
+	@find data/po -name "*.mo" -exec rm -f {} \;
 
 clean-docs:
 	rm -rf doc/_build
@@ -314,11 +324,11 @@ update-po:
 	) || ( \
 	    echo "Skipping .desktop files, is your gettext version < 0.19.1?" && \
 	    touch guake-desktop.pot)
-	@msgcat --use-first guake-python.pot guake-glade.pot guake-desktop.pot > po/guake.pot
+	@msgcat --use-first guake-python.pot guake-glade.pot guake-desktop.pot > data/po/guake.pot
 	@rm guake-python.pot guake-glade.pot guake-desktop.pot
-	@for f in $$(find po -iname "*.po"); do \
+	@for f in $$(find data/po -iname "*.po"); do \
 	    echo "updating $$f"; \
-	    msgcat --use-first "$$f" po/guake.pot > "$$f.new"; \
+	    msgcat --use-first "$$f" data/po/guake.pot > "$$f.new"; \
 	    mv "$$f.new" $$f; \
 	done;
 
@@ -346,16 +356,17 @@ generate-desktop:
 				cp $(DEV_DATA_DIR)/guake-prefs.template.desktop $(DEV_DATA_DIR)/guake-prefs.desktop)
 
 generate-paths:
-	cp -f guake/paths.py.in guake/paths.py
-	# Generic
-	@sed -i -e 's|{{ LOGIN_DESTOP_PATH }}||g' guake/paths.py
-	@sed -i -e 's|{{ AUTOSTART_FOLDER }}||g' guake/paths.py
-	# Dev environment:
-	sed -i -e 's|{{ LOCALE_DIR }}|$(DEV_LOCALE_DIR)|g' guake/paths.py
-	sed -i -e 's|{{ IMAGE_DIR }}|$(DEV_IMAGE_DIR)|g' guake/paths.py
-	sed -i -e 's|{{ GUAKE_THEME_DIR }}|$(DEV_GUAKE_THEME_DIR)|g' guake/paths.py
-	sed -i -e 's|{{ GLADE_DIR }}|$(DEV_GLADE_DIR)|g' guake/paths.py
-	sed -i -e 's|{{ SCHEMA_DIR }}|$(DEV_SCHEMA_DIR)|g' guake/paths.py
+	@echo "Generating path.py..."
+	@cp -f guake/paths.py.in guake/paths.py
+	@# Generic
+	@sed -i -e 's|{{ LOGIN_DESTOP_PATH }}|""|g' guake/paths.py
+	@sed -i -e 's|{{ AUTOSTART_FOLDER }}|""|g' guake/paths.py
+	@# Dev environment:
+	@sed -i -e 's|{{ LOCALE_DIR }}|get_default_locale_dir()|g' guake/paths.py
+	@sed -i -e 's|{{ IMAGE_DIR }}|get_default_image_dir()|g' guake/paths.py
+	@sed -i -e 's|{{ GUAKE_THEME_DIR }}|get_default_theme_dir()|g' guake/paths.py
+	@sed -i -e 's|{{ GLADE_DIR }}|get_default_glade_dir()|g' guake/paths.py
+	@sed -i -e 's|{{ SCHEMA_DIR }}|get_default_schema_dir()|g' guake/paths.py
 
 reno:
 	pipenv run reno new $(SLUG) --edit
